@@ -1,0 +1,202 @@
+-- ============================================================
+-- ALTERAÇÕES NAS TABELAS (exercícios 5 e 6)
+-- ============================================================
+
+ALTER TABLE Filme
+    ADD COLUMN Status VARCHAR(10) DEFAULT 'Disponível';
+
+ALTER TABLE Locacoes
+    ADD COLUMN Data_Devolucao DATE NULL;
+
+
+-- ============================================================
+-- 1. CRUD DE CLIENTES
+-- ============================================================
+
+-- Incluir_Cliente
+DELIMITER $$
+CREATE PROCEDURE Incluir_Cliente(
+    IN p_Nome        VARCHAR(100),
+    IN p_Data_Nasc   DATE,
+    IN p_Cidade      VARCHAR(80)
+)
+BEGIN
+    INSERT INTO Clientes (Nome, Data_Nasc, Cidade)
+    VALUES (p_Nome, p_Data_Nasc, p_Cidade);
+END$$
+DELIMITER ;
+
+-- Alterar_Cliente
+DELIMITER $$
+CREATE PROCEDURE Alterar_Cliente(
+    IN p_ID_Cliente  INT,
+    IN p_Nome        VARCHAR(100),
+    IN p_Data_Nasc   DATE,
+    IN p_Cidade      VARCHAR(80)
+)
+BEGIN
+    UPDATE Clientes
+    SET Nome       = p_Nome,
+        Data_Nasc  = p_Data_Nasc,
+        Cidade     = p_Cidade
+    WHERE ID_Cliente = p_ID_Cliente;
+END$$
+DELIMITER ;
+
+-- Selecionar_Cliente
+DELIMITER $$
+CREATE PROCEDURE Selecionar_Cliente(
+    IN p_ID_Cliente INT
+)
+BEGIN
+    SELECT ID_Cliente, Nome, Data_Nasc, Cidade
+    FROM   Clientes
+    WHERE  ID_Cliente = p_ID_Cliente;
+END$$
+DELIMITER ;
+
+-- Excluir_Cliente
+DELIMITER $$
+CREATE PROCEDURE Excluir_Cliente(
+    IN p_ID_Cliente INT
+)
+BEGIN
+    DELETE FROM Clientes
+    WHERE ID_Cliente = p_ID_Cliente;
+END$$
+DELIMITER ;
+
+
+-- ============================================================
+-- 2. ANIVERSARIANTES DO MÊS
+-- Resultado: Nome | Dia
+-- ============================================================
+
+DELIMITER $$
+CREATE PROCEDURE proc_Aniversariantes_Mes(
+    IN p_Mes INT          -- número do mês (1-12)
+)
+BEGIN
+    SELECT
+        Nome,
+        DAY(Data_Nasc) AS Dia
+    FROM   Clientes
+    WHERE  MONTH(Data_Nasc) = p_Mes
+    ORDER  BY DAY(Data_Nasc);
+END$$
+DELIMITER ;
+
+-- Exemplo de uso:
+-- CALL proc_Aniversariantes_Mes(7);
+
+
+-- ============================================================
+-- 3. RESUMO DE ANIVERSARIANTES POR MÊS
+-- Meses sem aniversariantes aparecem com 0
+-- ============================================================
+
+DELIMITER $$
+CREATE PROCEDURE Resumo_Aniversariantes()
+BEGIN
+    -- Gera os 12 meses e faz LEFT JOIN com os clientes
+    WITH meses AS (
+        SELECT 1 AS Mes UNION SELECT 2 UNION SELECT 3  UNION SELECT 4
+        UNION  SELECT 5 UNION SELECT 6 UNION SELECT 7  UNION SELECT 8
+        UNION  SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12
+    )
+    SELECT
+        m.Mes,
+        MONTHNAME(STR_TO_DATE(CONCAT('2000-', m.Mes, '-01'), '%Y-%m-%d')) AS Nome_Mes,
+        COUNT(c.ID_Cliente) AS Total_Aniversariantes
+    FROM   meses m
+    LEFT JOIN Clientes c ON MONTH(c.Data_Nasc) = m.Mes
+    GROUP  BY m.Mes
+    ORDER  BY m.Mes;
+END$$
+DELIMITER ;
+
+
+-- ============================================================
+-- 4. CLIENTES DE UMA CIDADE COM IDADE <= SOLICITADA
+-- Resultado: [Nome do Cliente] | [Data Nascimento] | [Idade]
+-- ============================================================
+
+DELIMITER $$
+CREATE PROCEDURE Clientes_Cidade_Idade(
+    IN p_Cidade      VARCHAR(80),
+    IN p_Idade_Max   INT
+)
+BEGIN
+    SELECT
+        Nome                                        AS `Nome do Cliente`,
+        Data_Nasc                                   AS `Data Nascimento`,
+        TIMESTAMPDIFF(YEAR, Data_Nasc, CURDATE())   AS Idade
+    FROM   Clientes
+    WHERE  Cidade = p_Cidade
+      AND  TIMESTAMPDIFF(YEAR, Data_Nasc, CURDATE()) <= p_Idade_Max
+    ORDER  BY Nome;
+END$$
+DELIMITER ;
+
+-- Exemplo:
+-- CALL Clientes_Cidade_Idade('São Paulo', 30);
+
+
+-- ============================================================
+-- 5. INCLUIR LOCAÇÃO
+-- Data_Locacao vem do sistema; marca filme como 'alugado'
+-- ============================================================
+
+DELIMITER $$
+CREATE PROCEDURE Incluir_Locacao(
+    IN p_ID_Cliente INT,
+    IN p_ID_Filme   INT
+)
+BEGIN
+    -- Insere a locação com a data do sistema
+    INSERT INTO Locacoes (ID_Cliente, ID_Filme, Data_Locacao, Data_Devolucao)
+    VALUES (p_ID_Cliente, p_ID_Filme, CURDATE(), NULL);
+
+    -- Marca o filme como alugado
+    UPDATE Filme
+    SET Status = 'alugado'
+    WHERE ID_Filme = p_ID_Filme;
+END$$
+DELIMITER ;
+
+-- Exemplo:
+-- CALL Incluir_Locacao(3, 7);
+
+
+-- ============================================================
+-- 6. DEVOLVER FILME
+-- Registra Data_Devolucao e volta Status para 'Disponível'
+-- ============================================================
+
+DELIMITER $$
+CREATE PROCEDURE Devolver_Filme(
+    IN p_ID_Locacao INT
+)
+BEGIN
+    DECLARE v_ID_Filme INT;
+
+    -- Descobre qual filme está nessa locação
+    SELECT ID_Filme
+    INTO   v_ID_Filme
+    FROM   Locacoes
+    WHERE  ID_Locacao = p_ID_Locacao;
+
+    -- Registra a data de devolução
+    UPDATE Locacoes
+    SET    Data_Devolucao = CURDATE()
+    WHERE  ID_Locacao = p_ID_Locacao;
+
+    -- Libera o filme novamente
+    UPDATE Filme
+    SET    Status = 'Disponível'
+    WHERE  ID_Filme = v_ID_Filme;
+END$$
+DELIMITER ;
+
+-- Exemplo:
+-- CALL Devolver_Filme(12);
