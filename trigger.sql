@@ -1,4 +1,3 @@
--- Cria e usa um banco próprio
 CREATE DATABASE Exercicio;
 GO
 USE Exercicio;
@@ -190,9 +189,7 @@ BEGIN
 END;
 GO
 
--- =====================
 -- TESTES
--- =====================
 
 INSERT INTO Produto (Descricao, Unidade) VALUES ('Caneta Azul', 'pc');
 INSERT INTO Produto (Descricao, Unidade) VALUES ('Caderno', 'un');
